@@ -54,7 +54,7 @@
 
 <div class="card">
   <h1>UAS Platform</h1>
-  <p id="login-msg">Log in met je Google-account om toegang te krijgen.</p>
+  <p id="login-msg">Kies je Google-account, of klik op de knop.</p>
   <div id="login-btn-container"></div>
   <div id="login-error"></div>
 </div>
@@ -72,6 +72,7 @@
   var errorEl = document.getElementById('login-error');
   var msgEl   = document.getElementById('login-msg');
   var btnContainer = document.getElementById('login-btn-container');
+  var _sent = false;
 
   function showError(text) {
     errorEl.textContent = text;
@@ -115,8 +116,14 @@
     google.accounts.id.initialize({
       client_id: CLIENT_ID,
       nonce: nonce,
-      callback: handleCredential
+      callback: handleCredential,
+      use_fedcm_for_prompt: true,
+      auto_select: false,
+      cancel_on_tap_outside: false,
+      itp_support: true
     });
+
+    // Knop altijd renderen (vangnet)
     google.accounts.id.renderButton(btnContainer, {
       type: 'standard',
       size: 'large',
@@ -125,20 +132,31 @@
       shape: 'rectangular',
       logo_alignment: 'left'
     });
+
+    // One Tap / FedCM account-kiezer — fout of niet-getoond is geen probleem
+    try {
+      google.accounts.id.prompt();
+    } catch (e) {
+      // prompt() niet beschikbaar of geblokkeerd — knop blijft werken
+    }
   };
   script.onerror = function() {
     showError('Kan Google-inlogservice niet laden. Controleer je internetverbinding.');
   };
   document.head.appendChild(script);
 
-  // ── Callback: stuur token naar opener ──
+  // ── Callback: stuur token naar opener (maximaal één keer) ──
   function handleCredential(response) {
+    if (_sent) return;
+
     try {
       var credential = response.credential;
       if (!credential) {
         showError('Geen token ontvangen van Google.');
         return;
       }
+
+      _sent = true;
 
       var message = {
         type: 'uas-gis-credential',

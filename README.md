@@ -13,7 +13,9 @@ JavaScript Origin geregistreerd kan worden.
 ## Werking
 
 1. De app opent `login.html?n=<nonce>&o=<origin>` in een popup.
-2. De gebruiker logt in via de Google-knop.
+2. De gateway toont de Google One Tap account-kiezer (FedCM) én een
+   inlogknop als vangnet. Beide wegen gebruiken dezelfde callback;
+   het token wordt maximaal één keer verstuurd.
 3. De gateway stuurt het ID-token via `postMessage` terug naar de app.
 4. De gateway sluit zichzelf.
 
