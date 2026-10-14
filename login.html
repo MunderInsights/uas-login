@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>UAS Platform — Inloggen</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8f9fa;
+      color: #1a1a2e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      padding: 40px 36px;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+    }
+    .card h1 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .card p {
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    #login-btn-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+    #login-error {
+      font-size: 13px;
+      color: #dc2626;
+      min-height: 20px;
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h1>UAS Platform</h1>
+  <p id="login-msg">Log in met je Google-account om toegang te krijgen.</p>
+  <div id="login-btn-container"></div>
+  <div id="login-error"></div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── Constanten ──
+  var CLIENT_ID = '137966621871-pte988lv1fe917rok9bquhi3ttijk521.apps.googleusercontent.com';
+  var ALLOWED_TARGETS = [
+    'https://n-lmyj5oak6in7kw62vkrwx3vr46eqnnrbuw7qjoy-0lu-script.googleusercontent.com'
+  ];
+
+  var errorEl = document.getElementById('login-error');
+  var msgEl   = document.getElementById('login-msg');
+  var btnContainer = document.getElementById('login-btn-container');
+
+  function showError(text) {
+    errorEl.textContent = text;
+    btnContainer.style.display = 'none';
+  }
+
+  // ── URL-parameters ──
+  var params = new URLSearchParams(window.location.search);
+  var nonce  = params.get('n') || '';
+  var origin = params.get('o') || '';
+
+  // Valideer nonce: 16-128 tekens, alfanumeriek + - _
+  if (!nonce || !/^[A-Za-z0-9_-]{16,128}$/.test(nonce)) {
+    msgEl.textContent = 'Open deze pagina via de UAS-app.';
+    btnContainer.style.display = 'none';
+    return;
+  }
+
+  // Valideer dat dit vanuit een popup is geopend
+  if (!window.opener) {
+    msgEl.textContent = 'Open deze pagina via de UAS-app.';
+    btnContainer.style.display = 'none';
+    return;
+  }
+
+  // Valideer herkomst tegen de vaste lijst
+  if (ALLOWED_TARGETS.indexOf(origin) === -1) {
+    msgEl.textContent = 'Niet toegestaan vanaf:';
+    var valEl = document.createElement('div');
+    valEl.style.cssText = 'font-size:12px;color:#888;margin-top:8px;word-break:break-all';
+    valEl.textContent = origin;
+    msgEl.parentNode.insertBefore(valEl, msgEl.nextSibling);
+    btnContainer.style.display = 'none';
+    return;
+  }
+
+  // ── Google Identity Services laden ──
+  var script = document.createElement('script');
+  script.src = 'https://accounts.google.com/gsi/client';
+  script.onload = function() {
+    google.accounts.id.initialize({
+      client_id: CLIENT_ID,
+      nonce: nonce,
+      callback: handleCredential
+    });
+    google.accounts.id.renderButton(btnContainer, {
+      type: 'standard',
+      size: 'large',
+      theme: 'outline',
+      text: 'sign_in_with',
+      shape: 'rectangular',
+      logo_alignment: 'left'
+    });
+  };
+  script.onerror = function() {
+    showError('Kan Google-inlogservice niet laden. Controleer je internetverbinding.');
+  };
+  document.head.appendChild(script);
+
+  // ── Callback: stuur token naar opener ──
+  function handleCredential(response) {
+    try {
+      var credential = response.credential;
+      if (!credential) {
+        showError('Geen token ontvangen van Google.');
+        return;
+      }
+
+      var message = {
+        type: 'uas-gis-credential',
+        credential: credential,
+        nonce: nonce
+      };
+
+      // Stuur naar ELKE toegestane target (alleen uit de vaste lijst)
+      for (var i = 0; i < ALLOWED_TARGETS.length; i++) {
+        try {
+          window.opener.postMessage(message, ALLOWED_TARGETS[i]);
+        } catch (e) {
+          // postMessage fout — target onbereikbaar
+        }
+      }
+
+      window.close();
+
+      // Als window.close() niet werkt (sommige browsers)
+      msgEl.textContent = 'Inloggen gelukt. Je kunt dit venster sluiten.';
+      btnContainer.style.display = 'none';
+      errorEl.textContent = '';
+    } catch (e) {
+      showError('Er ging iets mis bij het inloggen. Sluit dit venster en probeer opnieuw.');
+    }
+  }
+})();
+</script>
+
+</body>
+</html>
